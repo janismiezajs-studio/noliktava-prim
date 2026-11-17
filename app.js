@@ -422,10 +422,10 @@
       const unexp = sum.IZD.new + sum.INV.new;
       const warn = unexp ? `<div class="alert warn"><b>Uzmanību:</b> ${unexp} ieraksti vēl nav eksportēti — tie tiks neatgriezeniski zaudēti, ja iepriekš neizveidosiet eksportu vai rezerves kopiju.</div>` : '';
       const r = await modal({ title: 'Dzēst visus ierakstus?',
-        html: `<p>Tiks izdzēsti <b>${recs.length}</b> ieraksti, visas sesijas un eksporta faili. Iestatījumi paliek.</p>${warn}<p class="mut">Lai apstiprinātu, ierakstiet <b>DZĒST</b> un ievadiet Admina PIN.</p><input type="text" autocapitalize="characters" autocomplete="off" placeholder="DZĒST"><input type="password" inputmode="numeric" placeholder="PIN" style="margin-top:8px">`,
+        html: `<p>Tiks izdzēsti <b>${recs.length}</b> ieraksti, visas sesijas un eksporta faili. Iestatījumi paliek.</p>${warn}<p class="mut">Lai apstiprinātu, ierakstiet <b>DZEST</b> (var arī DZĒST) un ievadiet Admina PIN.</p><input type="text" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="DZEST"><input type="password" inputmode="numeric" placeholder="PIN" style="margin-top:8px">`,
         buttons: [{ id: 'x', label: 'Atcelt' }, { id: 'ok', label: 'Dzēst', cls: 'dng' }] });
       if (r.btn !== 'ok') return;
-      if (String(r.vals[0] || '').trim().toUpperCase() !== 'DZĒST') return toast('Apstiprinājuma vārds nesakrīt — nekas nav dzēsts', 4000);
+      if (String(r.vals[0] || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase() !== 'DZEST') return toast('Jāieraksta DZEST (vai DZĒST) — nekas nav dzēsts', 4000);
       if (!(await core.verifyPin(r.vals[1]))) return toast('Nepareizs PIN — nekas nav dzēsts', 4000);
       try {
         const n = await core.resetData(S.role);
