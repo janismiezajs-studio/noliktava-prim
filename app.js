@@ -38,6 +38,7 @@
       get: (s, k) => run(s, 'readonly', os => os.get(k)),
       put: (s, o) => run(s, 'readwrite', os => os.put(o)),
       getAll: s => run(s, 'readonly', os => os.getAll()),
+      clear: s => run(s, 'readwrite', os => os.clear()),
     };
   }
 
@@ -279,6 +280,8 @@
     h += `<div class="card"><h2>Rezerves kopija (JSON)</h2><p class="mut">Visi lokālie dati vienā failā — glabājiet drošā vietā. Atjaunošana tikai pievieno trūkstošo, esošo nepārraksta.</p>
       <div class="row"><button class="btn" data-act="backup">Izveidot kopiju</button><button class="btn" data-act="restorePick">Atjaunot no kopijas</button></div>
       <input type="file" id="restoreIn" accept=".json,application/json" hidden></div>`;
+    h += `<div class="card"><h2>Darba datu dzēšana</h2><p class="mut">Izdzēš visus ierakstus, sesijas un izveidotos eksporta failus šajā ierīcē (piem., pēc testēšanas). Iestatījumi — PIN, noliktavas, saņēmēji, preču saraksts — paliek. Darbība nav atceļama; iepriekš var izveidot rezerves kopiju.</p>
+      <button class="btn dng" data-act="resetData" style="width:100%">Dzēst visus ierakstus…</button></div>`;
     return h;
   }
 
@@ -412,6 +415,24 @@
     shareExport: async d => { const x = await core.getExport(d.id); if (x) await shareFile(x.fileName, x.csv, 'text/csv'); },
     backup: async () => { const b = await core.backup(); await shareFile(`NoliktavaPRIM_backup_${C.nowParts().stamp}.json`, JSON.stringify(b), 'application/json'); },
     restorePick: () => $('#restoreIn').click(),
+    resetData: async () => {
+      if (!isAdmin()) return toast('Tikai Admins');
+      const sum = await core.summary();
+      const recs = await core.listRecords();
+      const unexp = sum.IZD.new + sum.INV.new;
+      const warn = unexp ? `<div class="alert warn"><b>Uzmanību:</b> ${unexp} ieraksti vēl nav eksportēti — tie tiks neatgriezeniski zaudēti, ja iepriekš neizveidosiet eksportu vai rezerves kopiju.</div>` : '';
+      const r = await modal({ title: 'Dzēst visus ierakstus?',
+        html: `<p>Tiks izdzēsti <b>${recs.length}</b> ieraksti, visas sesijas un eksporta faili. Iestatījumi paliek.</p>${warn}<p class="mut">Lai apstiprinātu, ierakstiet <b>DZĒST</b> un ievadiet Admina PIN.</p><input type="text" autocapitalize="characters" autocomplete="off" placeholder="DZĒST"><input type="password" inputmode="numeric" placeholder="PIN" style="margin-top:8px">`,
+        buttons: [{ id: 'x', label: 'Atcelt' }, { id: 'ok', label: 'Dzēst', cls: 'dng' }] });
+      if (r.btn !== 'ok') return;
+      if (String(r.vals[0] || '').trim().toUpperCase() !== 'DZĒST') return toast('Apstiprinājuma vārds nesakrīt — nekas nav dzēsts', 4000);
+      if (!(await core.verifyPin(r.vals[1]))) return toast('Nepareizs PIN — nekas nav dzēsts', 4000);
+      try {
+        const n = await core.resetData(S.role);
+        S.sid = null; S.cap = newCap(); S.recId = null;
+        toast(`Izdzēsts: ${n.records} ieraksti, ${n.sessions} sesijas, ${n.exports} faili`, 4500); go('home');
+      } catch (e) { toast(e.message, 4500); }
+    },
     loadList: d => { S.loadTarget = d.target; $('#listFile').click(); },
     saveSettings: async () => {
       try {

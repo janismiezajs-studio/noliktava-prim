@@ -1,4 +1,4 @@
-# NoliktavaPRIM v1.1.0 — bezsaistes tīmekļa lietotne (PWA) iPhone
+# NoliktavaPRIM v1.2.0 — bezsaistes tīmekļa lietotne (PWA) iPhone
 
 Inventarizācija un izdošana ar kameras skenēšanu; dati glabājas telefonā; eksports CSV pēc `06_CSV_specifikacija v1.5`.
 
@@ -30,6 +30,9 @@ Kamera Safari darbojas tikai ar HTTPS, bezsaistes režīmam vajag service worker
 
 ## Preces nosaukums (v1.1.0)
 Iestatījumos preču sarakstu var ielādēt ar nosaukumiem: rinda `kods;nosaukums;mērvienība` (UTF-8, `;`). Pēc skenēšanas lietotne rāda preces nosaukumu un mērvienību, ieraksts saglabā nosaukumu (CSV eksports nemainās). Sarakstu izveido QR ģeneratorā: **Eksportēt lietotnei**.
+
+## Darba datu dzēšana (v1.2.0)
+Admins → Datu apmaiņa → apakšā “Dzēst visus ierakstus…”. Izdzēš visus ierakstus, sesijas un eksporta failus šajā ierīcē (piem., pēc testēšanas, pirms reālās uzskaites sākuma). Nepieciešams ierakstīt “DZĒST” un ievadīt Admina PIN; ja ir neeksportēti ieraksti, tiek rādīts brīdinājums. Iestatījumi (PIN, noliktavas, saņēmēji, preču saraksts) paliek. Darbība nav atceļama — iepriekš var izveidot rezerves kopiju. Darbiniekam šīs iespējas nav.
 
 ## Atjaunināšana
 Nomainiet failus repozitorijā; `VERSION` jāsaskaņo `core.js` un `sw.js`. Lokālie dati netiek dzēsti. Lietotne parādīs ziņu — aizveriet un atveriet to vēlreiz.

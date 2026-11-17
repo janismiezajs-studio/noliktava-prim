@@ -6,7 +6,7 @@
 })(typeof self !== 'undefined' ? self : globalThis, function (root) {
   'use strict';
 
-  const VERSION = '1.1.0';
+  const VERSION = '1.2.0';
   const MODE = { INV: 'INV', IZD: 'IZD' };
   const MODE_NAME = { INV: 'Inventarizācija', IZD: 'Izdošana' };
   const ROLE = { ADMIN: 'ADMIN', WORKER: 'DARBINIEKS' };
@@ -379,7 +379,21 @@
       return n;
     }
 
-    return { getSettings, saveSettings, hasPin, verifyPin, setPin, startSession, getSession, completeSession, listSessions,
+    /** v1.2.0: visu darba datu (ieraksti, sesijas, eksporta faili, numerācija) dzēšana — tikai Admins.
+     *  Iestatījumi (PIN, noliktavas, saņēmēji, preču saraksts) tiek saglabāti. */
+    async function resetData(role) {
+      requireAdmin(role);
+      const n = { records: 0, sessions: 0, exports: 0, unexported: 0 };
+      const recs = await storage.getAll('records');
+      n.records = recs.length; n.unexported = recs.filter(r => r.Statuss !== REC.EXP).length;
+      n.sessions = (await storage.getAll('sessions')).length;
+      n.exports = (await storage.getAll('exports')).length;
+      for (const s of ['records', 'sessions', 'exports']) await storage.clear(s);
+      await storage.put('kv', { k: 'seq', v: 0 });
+      return n;
+    }
+
+    return { resetData, getSettings, saveSettings, hasPin, verifyPin, setPin, startSession, getSession, completeSession, listSessions,
              listRecords, getRecord, addRecord, editRecord, summary, exportUnexported, listExports, getExport, backup, restore };
   }
 
@@ -392,6 +406,7 @@
       async get(s, k) { return clone(data[s].get(k)); },
       async put(s, o) { data[s].set(o[keyOf[s]], clone(o)); },
       async getAll(s) { return Array.from(data[s].values(), clone); },
+      async clear(s) { data[s].clear(); },
     };
   }
 
