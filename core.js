@@ -6,7 +6,7 @@
 })(typeof self !== 'undefined' ? self : globalThis, function (root) {
   'use strict';
 
-  const VERSION = '1.0.0';
+  const VERSION = '1.1.0';
   const MODE = { INV: 'INV', IZD: 'IZD' };
   const MODE_NAME = { INV: 'Inventarizācija', IZD: 'Izdošana' };
   const ROLE = { ADMIN: 'ADMIN', WORKER: 'DARBINIEKS' };
@@ -85,6 +85,57 @@
     return list.find(x => x.toLowerCase() === low) || null;
   }
 
+  /** Teksts rādīšanai (nosaukums, mērvienība): vadības rakstzīmes → atstarpe, lieki tukšumi noņemti. */
+  function cleanText(s, max) {
+    return String(s == null ? '' : s).replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max || 120);
+  }
+  /** Viena rinda → šūnas. Pēdiņas tiek ņemtas vērā tikai šūnas sākumā ("..." ar "" iekšā, kā Excel CSV); pēdiņa vārda vidū
+   *  (piem. 1/4" ) ir parasta rakstzīme. */
+  function splitCells(line, d) {
+    const out = []; const n = line.length; let i = 0;
+    for (;;) {
+      if (line[i] === '"') {
+        let j = i + 1, s = '';
+        for (; j < n; j++) {
+          if (line[j] === '"') { if (line[j + 1] === '"') { s += '"'; j++; } else break; } else s += line[j];
+        }
+        if (j < n && (j + 1 === n || line[j + 1] === d)) {
+          out.push(s);
+          if (j + 1 === n) break;
+          i = j + 2; continue;
+        }
+      }
+      const k = line.indexOf(d, i);
+      if (k < 0) { out.push(line.slice(i)); break; }
+      out.push(line.slice(i, k)); i = k + 1;
+    }
+    return out;
+  }
+  /** Preču saraksts: rindas "kods;nosaukums;mērvienība" (nosaukums un mērvienība neobligāti; atdalītājs ; vai TAB vai ,).
+   *  Atgriež { codes, info: {kods: {n, u}}, lines } — kodi bez dublikātiem (pirmais uzvar), galvenes rinda tiek izlaista. */
+  function parseProducts(input) {
+    const text = Array.isArray(input) ? input.join('\n') : String(input == null ? '' : input).replace(/^\uFEFF/, '');
+    const lines = text.split(/\r\n|\r|\n/).filter(l => l.trim() !== '');
+    const first = lines[0] || '';
+    const d = first.includes(';') ? ';' : first.includes('\t') ? '\t' : first.includes(',') ? ',' : ';';
+    const codes = [], info = {}, seen = new Set();
+    for (const line of lines) {
+      const cells = splitCells(line, d);
+      const code = normCode(cells[0]);
+      if (!code || seen.has(code)) continue;
+      if (/^(kods|artikuls|preces\s*kods|itemcode|item\s*code|code)$/i.test(code) && !seen.size && !codes.length) continue;
+      seen.add(code); codes.push(code);
+      const n = cleanText(cells[1], 120), u = cleanText(cells[2], 20);
+      if (n || u) info[code] = { n, u };
+    }
+    return { codes, info, lines: codes.map(c => productLine(c, info[c])) };
+  }
+  /** Saraksta rinda rediģēšanai/saglabāšanai: kods vai kods;nosaukums;mērvienība (";" nosaukumā aizstāts ar ","). */
+  function productLine(code, inf) {
+    if (!inf || (!inf.n && !inf.u)) return code;
+    return code + ';' + String(inf.n || '').replace(/;/g, ',') + (inf.u ? ';' + String(inf.u).replace(/;/g, ',') : '');
+  }
+
   // ------------------------------------------------------------ CSV
   function csvCell(v) {
     const s = String(v == null ? '' : v);
@@ -146,12 +197,13 @@
     // ---------- iestatījumi
     async function getSettings() {
       const kv = await storage.get('kv', 'settings');
-      return Object.assign({ warehouses: [], recipients: [], products: [], pinHash: null, pinSalt: null }, kv ? kv.v : {});
+      return Object.assign({ warehouses: [], recipients: [], products: [], productInfo: {}, pinHash: null, pinSalt: null }, kv ? kv.v : {});
     }
     async function saveSettings(patch, role) {
       requireAdmin(role);
       const cur = await getSettings();
-      for (const k of ['warehouses', 'recipients', 'products']) if (k in patch) cur[k] = normList(patch[k]);
+      for (const k of ['warehouses', 'recipients']) if (k in patch) cur[k] = normList(patch[k]);
+      if ('products' in patch) { const pp = parseProducts(patch.products); cur.products = pp.codes; cur.productInfo = pp.info; }
       await storage.put('kv', { k: 'settings', v: cur });
       return cur;
     }
@@ -242,7 +294,7 @@
       const p = nowParts(clock());
       const rec = {
         RecordID: uuid(), SessionID: sess.SessionID, Modulis: sess.Modulis, Noliktava: sess.Noliktava,
-        PrecesKods: code, Skaits: qty, KamIzdots: kam, Datums: p.date, Laiks: p.time,
+        PrecesKods: code, Nosaukums: ((st.productInfo || {})[code] || {}).n || '', Skaits: qty, KamIzdots: kam, Datums: p.date, Laiks: p.time,
         Statuss: REC.OK, Neatpazita: st.products.length > 0 && !st.products.includes(code),
         Seq: await nextSeq(), Labots: false, ExportId: null,
       };
@@ -300,7 +352,7 @@
       const st = await getSettings();
       return {
         format: 'NoliktavaPRIM-backup', version: VERSION, created: nowParts(clock()).date + ' ' + nowParts(clock()).time,
-        settings: { warehouses: st.warehouses, recipients: st.recipients, products: st.products },
+        settings: { warehouses: st.warehouses, recipients: st.recipients, products: st.products, productInfo: st.productInfo },
         sessions: await storage.getAll('sessions'), records: await storage.getAll('records'),
         exports: await storage.getAll('exports'),
       };
@@ -322,6 +374,7 @@
       const st = await getSettings();
       const patch = {};
       for (const k of ['warehouses', 'recipients', 'products']) if (!st[k].length && data.settings && data.settings[k]) patch[k] = data.settings[k];
+      if (patch.products) { const inf = (data.settings && data.settings.productInfo) || {}; patch.products = patch.products.map(c => productLine(c, inf[c])); }
       if (Object.keys(patch).length) await saveSettings(patch, role);
       return n;
     }
@@ -343,5 +396,5 @@
   }
 
   return { VERSION, MODE, MODE_NAME, ROLE, REC, SESS, HEAD, FILE_PREFIX, PrimError, nowParts, uuid, newSessionId, normCode,
-           parseQty, normList, matchList, csvCell, buildCsv, parseCsv, createApp, memoryStorage };
+           parseQty, normList, matchList, cleanText, splitCells, parseProducts, productLine, csvCell, buildCsv, parseCsv, createApp, memoryStorage };
 });

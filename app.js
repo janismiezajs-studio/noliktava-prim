@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const isAdmin = () => S.role === C.ROLE.ADMIN;
-  const newCap = () => ({ code: '', flagged: false, existing: null, editId: null, qtyPrefill: '' });
+  const newCap = () => ({ code: '', name: '', unit: '', flagged: false, existing: null, editId: null, qtyPrefill: '' });
   const S = { role: C.ROLE.WORKER, screen: 'home', mode: null, sid: null, cap: newCap(),
               flt: { mod: 'ALL', st: 'ALL' }, recId: null, hideBanner: false, persisted: null, busy: false, loadTarget: null };
   let core;
@@ -195,7 +195,7 @@
           <div class="row"><input class="grow" id="codeIn" type="text" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" data-enter="typeCode" placeholder="Preces kods"><button class="btn pri" data-act="typeCode">OK</button></div></div>`;
       } else {
         const ex = cap.existing;
-        h += `<div class="card"><div class="row"><div class="grow"><div class="mut">Preces kods</div><div class="code">${esc(cap.code)}</div></div><button class="btn" data-act="clearCode">Mainīt</button></div>`;
+        h += `<div class="card"><div class="row"><div class="grow"><div class="mut">Preces kods</div><div class="code">${esc(cap.code)}</div>${cap.name ? `<div class="pname">${esc(cap.name)}</div>` : (!st.products.length ? '<div class="mut">Preču saraksts nav ielādēts — nosaukums netiek rādīts.</div>' : '')}</div><button class="btn" data-act="clearCode">Mainīt</button></div>`;
         if (cap.flagged) h += '<div class="alert warn"><b>NEATPAZĪTA PRECE</b> — kods nav preču kodu sarakstā. Ieraksts tiks saglabāts, pārbaude notiks importā.</div>';
         if (ex && !cap.editId) {
           h += `<div class="alert warn"><b>JAU PĀRSKAITĪTS</b><br>Šajā sesijā šai precei jau ir ieraksts: <b>${esc(qtyTxt(ex.Skaits))}</b> (${esc(fmtDT(ex.Datums + ' ' + ex.Laiks))}).`;
@@ -205,7 +205,7 @@
           h += '</div></div></div>';
         } else {
           if (cap.editId) h += '<div class="alert info">Labošana: tiks mainīts esošā ieraksta skaits (RecordID nemainās).</div>';
-          h += `<label for="qty">Skaits</label><input id="qty" type="text" inputmode="decimal" autocomplete="off" data-enter="confirm" value="${esc(cap.qtyPrefill)}" placeholder="${inv ? 'noskaitītais skaits' : 'izdodamais skaits'}">`;
+          h += `<label for="qty">Skaits${cap.unit ? ' (' + esc(cap.unit) + ')' : ''}</label><input id="qty" type="text" inputmode="decimal" autocomplete="off" data-enter="confirm" value="${esc(cap.qtyPrefill)}" placeholder="${inv ? 'noskaitītais skaits' : 'izdodamais skaits'}">`;
           if (!inv) {
             if (!st.recipients.length) h += '<div class="alert err">Saņēmēju saraksts ir tukšs — Admins to ievada Iestatījumos.</div>';
             h += `<label for="rcp">Saņēmējs</label><select id="rcp"><option value="">— izvēlieties —</option>${st.recipients.map(r => `<option value="${esc(r)}" ${r === sess.DefaultKam ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select>`;
@@ -216,7 +216,7 @@
     }
     if (recs.length) {
       h += '<div class="card"><h2>Pēdējie ieraksti</h2>' + recs.slice(0, 5).map(r =>
-        `<div class="rec"><div class="row"><div class="grow code" style="font-size:16px">${esc(r.PrecesKods)}</div><b>${esc(qtyTxt(r.Skaits))}</b></div><div class="mut">${esc(r.KamIzdots ? r.KamIzdots + ' · ' : '')}${esc(r.Laiks)} ${r.Neatpazita ? '<span class="pill warn">neatpazīta</span>' : ''}${r.Statuss === C.REC.EXP ? '<span class="pill exp">eksportēts</span>' : ''}</div></div>`).join('') + '</div>';
+        `<div class="rec"><div class="row"><div class="grow code" style="font-size:16px">${esc(r.PrecesKods)}</div><b>${esc(qtyTxt(r.Skaits))}</b></div>${r.Nosaukums ? `<div class="pname sm">${esc(r.Nosaukums)}</div>` : ''}<div class="mut">${esc(r.KamIzdots ? r.KamIzdots + ' · ' : '')}${esc(r.Laiks)} ${r.Neatpazita ? '<span class="pill warn">neatpazīta</span>' : ''}${r.Statuss === C.REC.EXP ? '<span class="pill exp">eksportēts</span>' : ''}</div></div>`).join('') + '</div>';
     }
     h += done ? '' : '<button class="btn dng" data-act="finish" style="width:100%;margin-top:4px">Pabeigt sesiju</button>';
     return h;
@@ -233,7 +233,7 @@
     if (!recs.length) return h + '<div class="card mut">Nav ierakstu.</div>';
     h += `<div class="card">${recs.slice(0, 200).map(r =>
       `<div class="rec" data-act="openRec" data-id="${esc(r.RecordID)}"><div class="row"><div class="grow code" style="font-size:17px">${esc(r.PrecesKods)}</div><b style="font-size:20px">${esc(qtyTxt(r.Skaits))}</b></div>
-       <div class="mut">${esc(C.MODE_NAME[r.Modulis])} · ${esc(r.Noliktava)}${r.KamIzdots ? ' · ' + esc(r.KamIzdots) : ''} · ${esc(fmtD(r.Datums))} ${esc(r.Laiks)}</div>
+       ${r.Nosaukums ? `<div class="pname sm">${esc(r.Nosaukums)}</div>` : ''}<div class="mut">${esc(C.MODE_NAME[r.Modulis])} · ${esc(r.Noliktava)}${r.KamIzdots ? ' · ' + esc(r.KamIzdots) : ''} · ${esc(fmtD(r.Datums))} ${esc(r.Laiks)}</div>
        <span class="pill ${r.Statuss === C.REC.EXP ? 'exp' : ''}">${esc(r.Statuss)}</span> ${r.Neatpazita ? '<span class="pill warn">neatpazīta</span>' : ''} ${r.Labots ? '<span class="pill warn">labots</span>' : ''}</div>`).join('')}</div>`;
     if (recs.length > 200) h += '<div class="mut">Rādīti jaunākie 200 ieraksti.</div>';
     return h;
@@ -244,7 +244,7 @@
     const st = await core.getSettings();
     const exp = r.Statuss === C.REC.EXP;
     let h = '<button class="btn" data-act="closeRec" style="margin-bottom:12px">‹ Atpakaļ uz sarakstu</button>';
-    h += `<div class="card"><div class="mut">Preces kods</div><div class="code">${esc(r.PrecesKods)}</div><div class="qty">${esc(qtyTxt(r.Skaits))}</div>
+    h += `<div class="card"><div class="mut">Preces kods</div><div class="code">${esc(r.PrecesKods)}</div>${r.Nosaukums ? `<div class="pname">${esc(r.Nosaukums)}</div>` : ''}<div class="qty">${esc(qtyTxt(r.Skaits))}</div>
       <div class="kv"><span>Modulis</span><span>${esc(C.MODE_NAME[r.Modulis])}</span></div>
       <div class="kv"><span>Noliktava</span><span>${esc(r.Noliktava)}</span></div>
       ${r.KamIzdots ? `<div class="kv"><span>Saņēmējs</span><span>${esc(r.KamIzdots)}</span></div>` : ''}
@@ -289,7 +289,7 @@
     let persisted = S.persisted == null ? 'nav zināms' : (S.persisted ? 'jā' : 'nē');
     return ta('sWh', 'Noliktavu saraksts', 'Viens kods rindā (kā Excel lapā L_Izvietojums, piem. K1, K2, HMP).', st.warehouses) +
       ta('sRc', 'Saņēmēju saraksts', 'Viens saņēmējs rindā — tieši kā Excel Iestatījumu tabulā (kolonna N). Projekts un zona lietotnē netiek glabāti.', st.recipients) +
-      ta('sPr', 'Preču kodu saraksts (neobligāts)', 'Ja ielādēts, kodi ārpus saraksta tiek atzīmēti kā “neatpazīta prece” (process netiek apturēts). Ja tukšs — pārbaude notiek tikai importā.', st.products) +
+      ta('sPr', 'Preču saraksts (neobligāts)', 'Rinda: kods;nosaukums;mērvienība (nosaukums un mērvienība neobligāti). Ja ielādēts, lietotne pēc skenēšanas rāda preces nosaukumu un kodi ārpus saraksta tiek atzīmēti kā “neatpazīta prece” (process netiek apturēts). Ja tukšs — pārbaude notiek tikai importā. Sarakstu var izveidot QR ģeneratorā (Eksportēt lietotnei).', st.products.map(c => C.productLine(c, (st.productInfo || {})[c]))) +
       '<button class="big ok" data-act="saveSettings">SAGLABĀT SARAKSTUS</button><input type="file" id="listFile" accept=".txt,.csv,text/plain,text/csv" hidden>' +
       '<div class="card" style="margin-top:14px"><h2>Admina PIN</h2><button class="btn" data-act="changePin">Mainīt PIN</button></div>' +
       `<div class="card"><h2>Par lietotni</h2><div class="kv"><span>Versija</span><b>${C.VERSION}</b></div><div class="kv"><span>Pastāvīga datu glabāšana</span><b>${persisted}</b></div><div class="kv"><span>Atvērta no sākuma ekrāna</span><b>${isStandalone() ? 'jā' : 'nē'}</b></div></div>`;
@@ -328,7 +328,8 @@
     const st = await core.getSettings(), sess = await core.getSession(S.sid);
     let existing = null;
     if (sess.Modulis === C.MODE.INV) existing = (await core.listRecords({ sessionId: sess.SessionID })).find(r => r.PrecesKods === code) || null;
-    S.cap = { code, flagged: st.products.length > 0 && !st.products.includes(code), existing, editId: null, qtyPrefill: '' };
+    const inf = (st.productInfo || {})[code] || {};
+    S.cap = { code, name: inf.n || '', unit: inf.u || '', flagged: st.products.length > 0 && !st.products.includes(code), existing, editId: null, qtyPrefill: '' };
     render();
   }
   async function beginSession(wh) {
@@ -415,7 +416,7 @@
     saveSettings: async () => {
       try {
         const st = await core.saveSettings({ warehouses: $('#sWh').value, recipients: $('#sRc').value, products: $('#sPr').value }, S.role);
-        toast(`Saglabāts: ${st.warehouses.length} noliktavas, ${st.recipients.length} saņēmēji, ${st.products.length} kodi`, 3500); render();
+        toast(`Saglabāts: ${st.warehouses.length} noliktavas, ${st.recipients.length} saņēmēji, ${st.products.length} preces (${Object.keys(st.productInfo || {}).length} ar nosaukumu)`, 4500); render();
       } catch (e) { toast(e.message, 4000); }
     },
     changePin: async () => {
@@ -445,7 +446,8 @@
       const f = e.target.files && e.target.files[0];
       if (e.target.id === 'listFile' && f) {
         const text = await readTextFile(f), ta = $('#' + S.loadTarget);
-        if (ta) { ta.value = C.normList(text).join('\n'); countList(ta.id); toast('Saraksts ielādēts — nospiediet SAGLABĀT'); }
+        if (ta && ta.id === 'sPr') { const pp = C.parseProducts(text); ta.value = pp.lines.join('\n'); countList(ta.id); toast(`Saraksts ielādēts: ${pp.codes.length} preces, ${Object.keys(pp.info).length} ar nosaukumu — nospiediet SAGLABĀT`, 4500); }
+        else if (ta) { ta.value = C.normList(text).join('\n'); countList(ta.id); toast('Saraksts ielādēts — nospiediet SAGLABĀT'); }
         e.target.value = '';
       }
       if (e.target.id === 'restoreIn' && f) {
