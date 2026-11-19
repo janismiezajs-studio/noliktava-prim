@@ -6,7 +6,7 @@
 })(typeof self !== 'undefined' ? self : globalThis, function (root) {
   'use strict';
 
-  const VERSION = '1.2.0';
+  const VERSION = '1.3.0';
   const MODE = { INV: 'INV', IZD: 'IZD' };
   const MODE_NAME = { INV: 'Inventarizācija', IZD: 'Izdošana' };
   const ROLE = { ADMIN: 'ADMIN', WORKER: 'DARBINIEKS' };
@@ -224,7 +224,8 @@
     }
 
     // ---------- sesijas
-    async function startSession(mode, warehouseInput) {
+    /** v1.3.0: Izdošanā sesija = noliktava + saņēmējs (viens akts). Vienlaikus var būt tikai viena atvērta izdošanas sesija. */
+    async function startSession(mode, warehouseInput, recipientInput) {
       if (!MODE[mode]) throw new PrimError('MODULIS_NEDERIGS', 'Nezināms modulis.');
       const st = await getSettings();
       if (!st.warehouses.length) {
@@ -234,9 +235,15 @@
       if (!wh) {
         throw new PrimError('NOLIKTAVA_NAV_SARAKSTA', `Kods "${normCode(warehouseInput)}" nav noliktavu sarakstā.`);   // L9
       }
+      let kam = '';
+      if (mode === MODE.IZD) {
+        const open = (await listSessions({ status: SESS.OPEN, mode: MODE.IZD }))[0];
+        if (open) throw new PrimError('IZD_ATVERTA', 'Izdošana jau ir atvērta. Turpiniet to vai pabeidziet, tad sāciet jaunu.', { existing: open });
+        kam = checkRecipient(st, recipientInput);                                                   // L9
+      }
       const p = nowParts(clock());
       const sess = { SessionID: newSessionId(clock()), Modulis: mode, Noliktava: wh, Statuss: SESS.OPEN,
-                     Sakts: `${p.date} ${p.time}`, Beigts: null, DefaultKam: '' };
+                     Sakts: `${p.date} ${p.time}`, Beigts: null, DefaultKam: '', Kam: kam };
       await storage.put('sessions', sess);
       return sess;
     }
@@ -286,7 +293,7 @@
       if (!code) throw new PrimError('KODS_TUKSS', 'Preces kods ir tukšs.');
       const qty = parseQty(input.qty, sess.Modulis);
       let kam = '';
-      if (sess.Modulis === MODE.IZD) kam = checkRecipient(st, input.recipient);
+      if (sess.Modulis === MODE.IZD) kam = checkRecipient(st, sess.Kam || input.recipient);        // v1.3.0: saņēmējs nāk no sesijas
       if (sess.Modulis === MODE.INV) {
         const dup = (await listRecords({ sessionId })).find(r => r.PrecesKods === code);
         if (dup) throw new PrimError('JAU_PARSKAITITS', 'JAU PĀRSKAITĪTS', { existing: dup });

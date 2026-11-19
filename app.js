@@ -134,10 +134,10 @@
   }
 
   // ------------------------------------------------------------ ekrāni
-  const TITLES = { home: 'NoliktavaPRIM', start: 'Sesijas sākums', capture: '', records: 'Ieraksti', exchange: 'Datu apmaiņa', settings: 'Iestatījumi' };
+  const TITLES = { home: 'NoliktavaPRIM', start: 'Sesijas sākums', recipient: 'Saņēmējs', capture: '', records: 'Ieraksti', exchange: 'Datu apmaiņa', settings: 'Iestatījumi' };
   function header() {
     let t = TITLES[S.screen];
-    if ((S.screen === 'start' || S.screen === 'capture') && S.mode) t = C.MODE_NAME[S.mode];
+    if ((S.screen === 'start' || S.screen === 'recipient' || S.screen === 'capture') && S.mode) t = C.MODE_NAME[S.mode];
     const back = S.screen !== 'home' ? '<button class="back" data-act="home">‹ Sākums</button>' : '';
     return `<header>${back}<h1>${esc(t)}</h1><button class="chip ${isAdmin() ? 'admin' : ''}" data-act="role">${isAdmin() ? 'Admins' : 'Darbinieks'}</button></header>`;
   }
@@ -154,7 +154,7 @@
     if (open.length) {
       const rows = await Promise.all(open.map(async s => {
         const n = (await core.listRecords({ sessionId: s.SessionID })).length;
-        return `<div class="rec row"><div class="grow"><b>${esc(C.MODE_NAME[s.Modulis])}</b> · ${esc(s.Noliktava)}<div class="mut">${nIer(n)} · sākta ${esc(fmtDT(s.Sakts))}</div></div><button class="btn pri" data-act="resume" data-id="${esc(s.SessionID)}">Turpināt</button></div>`;
+        return `<div class="rec row"><div class="grow"><b>${esc(C.MODE_NAME[s.Modulis])}</b> · ${esc(s.Noliktava)}${s.Kam ? ' → ' + esc(s.Kam) : ''}<div class="mut">${nIer(n)} · sākta ${esc(fmtDT(s.Sakts))}</div></div><button class="btn pri" data-act="resume" data-id="${esc(s.SessionID)}">Turpināt</button></div>`;
       }));
       h += `<div class="card"><h2>Atvērtās sesijas</h2>${rows.join('')}</div>`;
     }
@@ -182,13 +182,21 @@
       <div class="wh">${st.warehouses.map(w => `<button class="btn" data-act="pickWh" data-wh="${esc(w)}">${esc(w)}</button>`).join('')}</div></div>`;
   }
 
+  async function screenRecipient() {
+    if (!S.pendingWh) return screenStart();
+    const st = await core.getSettings();
+    return `<div class="card"><div class="kv"><span>Noliktava</span><b>${esc(S.pendingWh)}</b></div></div>
+      <div class="card"><h2>2. solis — saņēmējs</h2><p class="mut">Saņēmējs attiecas uz visu šo izdošanu (vienu aktu). Citam saņēmējam pabeidziet izdošanu un sāciet jaunu.</p>
+      <div class="wh">${st.recipients.map(r => `<button class="btn" data-act="pickRcp" data-r="${esc(r)}">${esc(r)}</button>`).join('')}</div></div>`;
+  }
+
   async function screenCapture() {
     const sess = await core.getSession(S.sid);
     if (!sess) { S.screen = 'home'; return screenHome(); }
     const st = await core.getSettings();
     const recs = await core.listRecords({ sessionId: sess.SessionID });
     const done = sess.Statuss === C.SESS.DONE, inv = sess.Modulis === C.MODE.INV, cap = S.cap;
-    let h = `<div class="card"><div class="kv"><span>Noliktava</span><b>${esc(sess.Noliktava)}</b></div><div class="kv"><span>Ieraksti sesijā</span><b>${recs.length}</b></div>${done ? '<div class="kv"><span>Statuss</span><span class="pill">Pabeigta</span></div>' : ''}</div>`;
+    let h = `<div class="card"><div class="kv"><span>Noliktava</span><b>${esc(sess.Noliktava)}</b></div>${sess.Kam ? `<div class="kv"><span>Saņēmējs</span><b>${esc(sess.Kam)}</b></div>` : ''}<div class="kv"><span>Ieraksti sesijā</span><b>${recs.length}</b></div>${done ? '<div class="kv"><span>Statuss</span><span class="pill">Pabeigta</span></div>' : ''}</div>`;
     if (!done) {
       if (!cap.code) {
         h += `<div class="card"><h2>Preces kods</h2><button class="big" data-act="scanProd">Skenēt preci</button>
@@ -207,7 +215,7 @@
         } else {
           if (cap.editId) h += '<div class="alert info">Labošana: tiks mainīts esošā ieraksta skaits (RecordID nemainās).</div>';
           h += `<label for="qty">Skaits${cap.unit ? ' (' + esc(cap.unit) + ')' : ''}</label><input id="qty" type="text" inputmode="decimal" autocomplete="off" data-enter="confirm" value="${esc(cap.qtyPrefill)}" placeholder="${inv ? 'noskaitītais skaits' : 'izdodamais skaits'}">`;
-          if (!inv) {
+          if (!inv && !sess.Kam) {
             if (!st.recipients.length) h += '<div class="alert err">Saņēmēju saraksts ir tukšs — Admins to ievada Iestatījumos.</div>';
             h += `<label for="rcp">Saņēmējs</label><select id="rcp"><option value="">— izvēlieties —</option>${st.recipients.map(r => `<option value="${esc(r)}" ${r === sess.DefaultKam ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select>`;
           }
@@ -298,7 +306,7 @@
       `<div class="card"><h2>Par lietotni</h2><div class="kv"><span>Versija</span><b>${C.VERSION}</b></div><div class="kv"><span>Pastāvīga datu glabāšana</span><b>${persisted}</b></div><div class="kv"><span>Atvērta no sākuma ekrāna</span><b>${isStandalone() ? 'jā' : 'nē'}</b></div></div>`;
   }
 
-  const SCREENS = { home: screenHome, start: screenStart, capture: screenCapture, records: screenRecords, exchange: screenExchange, settings: screenSettings };
+  const SCREENS = { home: screenHome, start: screenStart, recipient: screenRecipient, capture: screenCapture, records: screenRecords, exchange: screenExchange, settings: screenSettings };
   let renderSeq = 0;
   async function render() {
     const seq = ++renderSeq;
@@ -337,6 +345,13 @@
   }
   async function beginSession(wh) {
     try {
+      if (S.mode === C.MODE.IZD) {                                   // v1.3.0: noliktava → saņēmējs → preces
+        const st = await core.getSettings();
+        const w = C.matchList(st.warehouses, wh);
+        if (!w) { toast(`Kods "${C.normCode(wh)}" nav noliktavu sarakstā.`, 4000); return; }
+        if (!st.recipients.length) { toast('Saņēmēju saraksts ir tukšs. Admins to ievada Iestatījumos.', 4000); return; }
+        return go('recipient', { pendingWh: w });
+      }
       const s = await core.startSession(S.mode, wh);
       S.sid = s.SessionID; S.cap = newCap();
       go('capture');
@@ -369,7 +384,21 @@
     hideBanner: () => { S.hideBanner = true; render(); },
     role: toggleRole,
     nav: d => { if ((d.to === 'exchange' || d.to === 'settings') && !isAdmin()) return toast('Tikai Admins'); S.recId = null; go(d.to); },
-    start: d => { S.mode = d.mode; go('start'); },
+    start: async d => {
+      S.mode = d.mode;
+      if (d.mode === C.MODE.IZD) {
+        const o = (await core.listSessions({ status: C.SESS.OPEN, mode: C.MODE.IZD }))[0];
+        if (o) { toast('Izdošana jau ir atvērta. Turpiniet to vai pabeidziet, tad sāciet jaunu.', 5000); return go('home'); }
+      }
+      go('start');
+    },
+    pickRcp: async d => {
+      try {
+        const s = await core.startSession(C.MODE.IZD, S.pendingWh, d.r);
+        S.sid = s.SessionID; S.cap = newCap(); S.pendingWh = null;
+        go('capture');
+      } catch (e) { toast(e.message, 4000); }
+    },
     resume: async d => { const s = await core.getSession(d.id); S.mode = s.Modulis; S.sid = s.SessionID; S.cap = newCap(); go('capture'); },
     scanWh: async () => { const t = await scan('Skenējiet noliktavas kodu'); if (t) beginSession(t); },
     pickWh: d => beginSession(d.wh),

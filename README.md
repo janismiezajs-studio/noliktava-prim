@@ -1,4 +1,4 @@
-# NoliktavaPRIM v1.2.1 — bezsaistes tīmekļa lietotne (PWA) iPhone
+# NoliktavaPRIM v1.3.0 — bezsaistes tīmekļa lietotne (PWA) iPhone
 
 Inventarizācija un izdošana ar kameras skenēšanu; dati glabājas telefonā; eksports CSV pēc `06_CSV_specifikacija v1.5`.
 
@@ -23,7 +23,8 @@ Kamera Safari darbojas tikai ar HTTPS, bezsaistes režīmam vajag service worker
 3. Atgriezieties Darbinieka režīmā (nospiediet **Admins**).
 
 ## Ikdiena
-- **Inventarizācija / Izdošana**: noliktavas kods → preces kods → skaits (→ saņēmējs) → **APSTIPRINĀT**. Sesija paliek atvērta, līdz nospiežat **Pabeigt sesiju**.
+- **Inventarizācija**: noliktavas kods → preces kods → skaits → **APSTIPRINĀT**. Sesija paliek atvērta, līdz nospiežat **Pabeigt sesiju**.
+- **Izdošana (v1.3.0)**: noliktava → saņēmējs (vienreiz visai izdošanai) → preces kods → skaits → **APSTIPRINĀT** (atkārtoti katrai precei) → **Pabeigt sesiju**. Viena izdošana = viens akts; vienlaikus var būt tikai viena atvērta izdošana. Citam saņēmējam pabeidziet izdošanu un sāciet jaunu.
 - **Datu apmaiņa (Admins)**: EKSPORTĒT → katram modulim atsevišķs fails → **Kopīgot / saglabāt** (AirDrop, Faili, e-pasts) → mapē `DATU_APMAINA\02_IENAKOSIE` → validators 03 / 03b.
 - Eksportēti ieraksti vairs nav labojami; faili paliek sarakstā atkārtotai kopīgošanai.
 - **Rezerves kopija (JSON)** — izveidojiet regulāri.
