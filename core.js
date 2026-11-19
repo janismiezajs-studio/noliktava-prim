@@ -6,7 +6,7 @@
 })(typeof self !== 'undefined' ? self : globalThis, function (root) {
   'use strict';
 
-  const VERSION = '1.3.0';
+  const VERSION = '1.4.0';
   const MODE = { INV: 'INV', IZD: 'IZD' };
   const MODE_NAME = { INV: 'Inventarizācija', IZD: 'Izdošana' };
   const ROLE = { ADMIN: 'ADMIN', WORKER: 'DARBINIEKS' };

@@ -93,6 +93,25 @@
     setTimeout(() => URL.revokeObjectURL(url), 30000);
   }
 
+  // v1.4: pēc sesijas pabeigšanas uzreiz izveido CSV un atver iOS koplietošanas izvēlni (komanda "Uz datoru" / Faili → OneDrive).
+  async function sendToComputer() {
+    const b = await core.exportUnexported();
+    if (!b.length) { toast('Nav ko sūtīt datoram', 3500); return; }
+    const files = b.map(x => new File([x.csv], x.fileName, { type: 'text/csv' }));
+    const names = b.map(x => x.fileName).join(', ');
+    const canShare = !!(navigator.canShare && navigator.canShare({ files }));
+    if (canShare) {
+      try { await navigator.share({ files, title: 'Uz datoru' }); toast('Faili nodoti', 3000); return; }
+      catch (e) { if (e && e.name === 'AbortError') { toast('Nosūtīšana atcelta. Faili ir sadaļā Datu apmaiņa.', 5000); return; } }
+    }
+    // iOS dažkārt prasa pieskārienu tieši pirms kopīgošanas — parādām lielo pogu.
+    const r = await modal({ title: 'Sūtīt datoram', html: `<p>Faili gatavi: <b style="word-break:break-all">${esc(names)}</b></p><p class="mut">Nospiediet pogu un izvēlieties komandu “Uz datoru” (vai Saglabāt failos → OneDrive → 02_IENAKOSIE).</p>`,
+      buttons: [{ id: 'x', label: 'Vēlāk' }, { id: 'send', label: 'SŪTĪT DATORAM', cls: 'pri' }] });
+    if (r.btn !== 'send') { toast('Faili ir sadaļā Datu apmaiņa.', 4000); return; }
+    try { if (canShare) await navigator.share({ files, title: 'Uz datoru' }); else for (const x of b) await shareFile(x.fileName, x.csv, 'text/csv'); }
+    catch (e) { if (!(e && e.name === 'AbortError')) toast('Neizdevās atvērt kopīgošanu: ' + e.message, 5000); }
+  }
+
   // ------------------------------------------------------------ svītrkodu skeneris (kamera, bezsaistē)
   let zxP;
   function loadZXing() {
@@ -279,7 +298,7 @@
       <div class="kv"><span>Inventarizācija — neeksportēti</span><b>${sum.INV.new}</b></div>`;
     if (sum.openInv) h += `<div class="alert warn">Ir ${sum.openInv} nepabeigta inventarizācijas sesija(s). Eksportā tiks iekļauti arī to apstiprinātie ieraksti.</div>`;
     h += `<button class="big ok" data-act="doExport" ${n ? '' : 'disabled'}>EKSPORTĒT (${n})</button>
-      <p class="mut">Tiek izveidots atsevišķs fails Izdošanai un Inventarizācijai. Pēc eksporta ieraksti kļūst par “Eksportēts”. Failu kopīgojiet ar AirDrop, sadaļu Faili vai e-pastu — tas jānonāk mapē DATU_APMAINA\\02_IENAKOSIE.</p></div>`;
+      <p class="mut">Tiek izveidots atsevišķs fails Izdošanai un Inventarizācijai. Pēc eksporta ieraksti kļūst par “Eksportēts”. Pēc sesijas pabeigšanas fails tiek piedāvāts automātiski. Kopīgojiet ar komandu “Uz datoru” vai Saglabāt failos → OneDrive — tam jānonāk mapē DATU_APMAINA\\02_IENAKOSIE.</p></div>`;
     h += '<div class="card"><h2>Izveidotie faili</h2>';
     h += exports.length ? exports.slice(0, 20).map(x =>
       `<div class="rec"><b style="word-break:break-all">${esc(x.fileName)}</b><div class="mut">${nIer(x.count)} · ${esc(fmtDT(x.created))}</div><button class="btn pri" data-act="shareExport" data-id="${esc(x.id)}" style="margin-top:6px">Kopīgot / saglabāt</button></div>`).join('')
@@ -422,7 +441,7 @@
     finish: async () => {
       const recs = await core.listRecords({ sessionId: S.sid });
       if (!(await confirmBox('Pabeigt sesiju?', `Sesijā: ${nIer(recs.length)}. Pēc pabeigšanas ierakstus šajā sesijā pievienot vairs nevarēs.`, 'Pabeigt'))) return;
-      await core.completeSession(S.sid); toast('Sesija pabeigta'); S.cap = newCap(); go('home');
+      await core.completeSession(S.sid); toast('Sesija pabeigta'); S.cap = newCap(); go('home'); try { await sendToComputer(); } catch (e) { toast(e.message, 4000); } render();
     },
     flt: d => { S.flt[d.grp] = d.val; render(); },
     openRec: d => { S.recId = d.id; render(); },

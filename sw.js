@@ -1,5 +1,5 @@
 /* NoliktavaPRIM — bezsaistes kešs (L10). Dati glabājas IndexedDB un šeit netiek skarti. */
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const CACHE = 'noliktavaprim-v' + VERSION;
 const ASSETS = ['./', 'index.html', 'core.js', 'app.js', 'zxing.min.js', 'manifest.webmanifest',
                 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
