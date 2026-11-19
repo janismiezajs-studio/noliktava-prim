@@ -97,6 +97,9 @@
   async function sendToComputer() {
     const b = await core.exportUnexported();
     if (!b.length) { toast('Nav ko sūtīt datoram', 3500); return; }
+    await shareBatches(b);
+  }
+  async function shareBatches(b) {
     const files = b.map(x => new File([x.csv], x.fileName, { type: 'text/csv' }));
     const names = b.map(x => x.fileName).join(', ');
     const canShare = !!(navigator.canShare && navigator.canShare({ files }));
@@ -178,6 +181,7 @@
       h += `<div class="card"><h2>Atvērtās sesijas</h2>${rows.join('')}</div>`;
     }
     h += '<div class="grid"><button class="big" data-act="start" data-mode="INV">Inventarizācija</button><button class="big" data-act="start" data-mode="IZD">Izdošana</button></div>';
+    h += '<div style="height:12px"></div><button class="big ok" data-act="sendPc">Sūtīt datoram</button>';
     h += '<div style="height:12px"></div><button class="big sec" data-act="nav" data-to="records">Ieraksti</button>';
     if (isAdmin()) {
       h += '<div style="height:12px"></div><div class="grid"><button class="big sec" data-act="nav" data-to="exchange">Datu apmaiņa</button><button class="big sec" data-act="nav" data-to="settings">Iestatījumi</button></div>';
@@ -459,6 +463,20 @@
         const b = await core.exportUnexported();
         toast(b.length ? `Izveidoti faili: ${b.length}. Nospiediet “Kopīgot / saglabāt”.` : 'Nav ko eksportēt', 4500); render();
       } catch (e) { toast(e.message, 4000); } finally { S.busy = false; }
+    },
+    sendPc: async () => {
+      if (S.busy) return; S.busy = true;
+      try {
+        const open = await core.listSessions({ status: C.SESS.OPEN });
+        const b = await core.exportUnexported();
+        if (b.length) { render(); await shareBatches(b); return; }
+        if (open.some(s => s.Modulis === C.MODE.IZD)) { toast('Vispirms pabeidziet atvērto izdošanu (Pabeigt sesiju).', 4500); return; }
+        // nav jaunu ierakstu — atkārtoti piedāvājam pēdējo izveidoto failu(s)
+        const ex = await core.listExports();
+        if (!ex.length) { toast('Vēl nav ko sūtīt datoram.', 3500); return; }
+        const stamp = ex[0].id.split('-')[0];
+        await shareBatches(ex.filter(x => x.id.split('-')[0] === stamp));
+      } catch (e) { toast(e.message, 4000); } finally { S.busy = false; render(); }
     },
     shareExport: async d => { const x = await core.getExport(d.id); if (x) await shareFile(x.fileName, x.csv, 'text/csv'); },
     backup: async () => { const b = await core.backup(); await shareFile(`NoliktavaPRIM_backup_${C.nowParts().stamp}.json`, JSON.stringify(b), 'application/json'); },

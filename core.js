@@ -6,7 +6,7 @@
 })(typeof self !== 'undefined' ? self : globalThis, function (root) {
   'use strict';
 
-  const VERSION = '1.4.0';
+  const VERSION = '1.4.1';
   const MODE = { INV: 'INV', IZD: 'IZD' };
   const MODE_NAME = { INV: 'Inventarizācija', IZD: 'Izdošana' };
   const ROLE = { ADMIN: 'ADMIN', WORKER: 'DARBINIEKS' };
@@ -334,7 +334,9 @@
     }
     /** Eksportē VISUS vēl neeksportētos ierakstus, atsevišķi Izdošanai un Inventarizācijai; ieraksti kļūst par "Eksportēts". */
     async function exportUnexported() {
-      const fresh = await listRecords({ status: REC.OK });
+      // Atvērtas izdošanas ieraksti netiek eksportēti — viens akts nedrīkst sadalīties divos failos.
+      const openIzd = new Set((await listSessions({ status: SESS.OPEN })).filter(s => s.Modulis === MODE.IZD).map(s => s.SessionID));
+      const fresh = (await listRecords({ status: REC.OK })).filter(r => !(r.Modulis === MODE.IZD && openIzd.has(r.SessionID)));
       const p = nowParts(clock());
       const batches = [];
       for (const mode of [MODE.IZD, MODE.INV]) {
